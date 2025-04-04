@@ -317,6 +317,17 @@ class BetaflightLogAnalyzer:
         self.tuning_history_path = "tuning_history.json"
         self._ensure_db_files_exist()
 
+    def find_column(self, df: pd.DataFrame, alternatives: List[str]) -> str | None:
+            """Finds the first matching column name (case-insensitive, ignoring spaces)."""
+            if df is None or df.empty: # Add check for empty DataFrame
+                return None
+            df_cols_cleaned = {col.strip().lower(): col for col in df.columns}
+            for alt in alternatives:
+                cleaned_alt = alt.strip().lower()
+                if cleaned_alt in df_cols_cleaned:
+                    return df_cols_cleaned[cleaned_alt] # Return original column name
+            return None
+
     def _ensure_db_files_exist(self):
         for db_path in [self.logs_db_path, self.tuning_history_path]:
             if not os.path.exists(db_path):
@@ -628,8 +639,8 @@ class BetaflightLogAnalyzer:
         logger.debug(f"Starting data preparation. Initial shape: {df.shape}, Columns: {df.columns.tolist()}")
 
         if df.empty:
-             logger.warning("Input DataFrame is empty before preparation.")
-             return df
+            logger.warning("Input DataFrame is empty before preparation.")
+            return df
 
         # 1. Clean Column Names (redundant check, but safe)
         df.columns = df.columns.str.strip().str.replace('"', '')
@@ -642,8 +653,8 @@ class BetaflightLogAnalyzer:
         if dropped_cols:
             logger.debug(f"Dropped fully NaN columns: {dropped_cols}")
         if df.empty:
-             logger.warning("DataFrame became empty after dropping all-NaN columns.")
-             return df
+            logger.warning("DataFrame became empty after dropping all-NaN columns.")
+            return df
 
         # 3. Convert to Numeric, Coercing Errors
         numeric_cols = []
@@ -712,12 +723,11 @@ class BetaflightLogAnalyzer:
                     metadata['time_column'] = time_col
                     time_index_set = True # Mark as successful
                 except Exception as e:
-                     logger.error(f"Could not set '{time_col}' as index: {e}. Proceeding without time index.", exc_info=True)
+                    logger.error(f"Could not set '{time_col}' as index: {e}. Proceeding without time index.", exc_info=True)
             else:
-                 logger.warning(f"Time column '{time_col}' is not numeric. Cannot set as index.")
+                logger.warning(f"Time column '{time_col}' is not numeric. Cannot set as index.")
         else:
-             logger.warning("No standard 'time' column found or not in DataFrame columns.")
-
+            logger.warning("No standard 'time' column found or not in DataFrame columns.")
 
         # 6. Drop Rows with NaNs in Essential Columns (after fill attempts)
         # Define essential columns for basic flight analysis
@@ -742,24 +752,23 @@ class BetaflightLogAnalyzer:
 
         initial_rows = len(df)
         if subset_cols: # Only drop if there's a valid subset
-             try:
-                 # This is the line that was failing
-                 df.dropna(subset=subset_cols, how='any', inplace=True)
-                 rows_dropped = initial_rows - len(df)
-                 if rows_dropped > 0: logger.warning(f"Dropped {rows_dropped} rows due to NaN in essential columns: {subset_cols}")
-             except KeyError as ke:
-                  logger.error(f"KeyError during dropna with subset {subset_cols}. Columns: {df.columns}, Index: {df.index.name}. Error: {ke}", exc_info=True)
-                  raise ke # Re-raise after logging details
-             except Exception as e_drop:
-                  logger.error(f"Error during dropna: {e_drop}", exc_info=True)
-                  raise e_drop # Re-raise other errors
+            try:
+                # This is the line that was failing
+                df.dropna(subset=subset_cols, how='any', inplace=True)
+                rows_dropped = initial_rows - len(df)
+                if rows_dropped > 0: logger.warning(f"Dropped {rows_dropped} rows due to NaN in essential columns: {subset_cols}")
+            except KeyError as ke:
+                logger.error(f"KeyError during dropna with subset {subset_cols}. Columns: {df.columns}, Index: {df.index.name}. Error: {ke}", exc_info=True)
+                raise ke # Re-raise after logging details
+            except Exception as e_drop:
+                logger.error(f"Error during dropna: {e_drop}", exc_info=True)
+                raise e_drop # Re-raise other errors
         else:
-             logger.warning("No essential columns found to check for NaNs.")
-
+            logger.warning("No essential columns found to check for NaNs.")
 
         if df.empty:
-             logger.error("DataFrame became empty after final NaN drop. Cannot proceed.")
-             raise ValueError("No valid data rows remaining after preparation.")
+            logger.error("DataFrame became empty after final NaN drop. Cannot proceed.")
+            raise ValueError("No valid data rows remaining after preparation.")
 
         logger.debug(f"Data preparation finished. Final shape: {df.shape}")
         return df
